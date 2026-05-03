@@ -12,14 +12,14 @@ const { generateSessionId, toJID } = require('./id');
 
 const activeSessions = new Map();
 
-// â”€â”€ Owner Info â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Owner Info ────────────────────────────────────────────
 const OWNER_NAME   = "DARK SURYA";
 const OWNER_NUMBER = "917797099719";
 const WA_CHANNEL   = "https://whatsapp.com/channel/0029Vb64JNKJf05UHKREBM1h";
 const WA_GROUP     = "https://chat.whatsapp.com/L0oWvAe4eeb6HBYIEPXGbo?mode=gi_t";
 const REPO         = "https://github.com/darksurya345/SURYA-X";
 const BOT_NAME     = "SURYA-X BOT";
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────
 
 async function sendVCard(sock, jid) {
   try {
@@ -32,14 +32,14 @@ async function sendVCard(sock, jid) {
       `END:VCARD`;
 
     const text =
-      `*âš¡ ${BOT_NAME}*\n\n` +
-      `*ðŸ‘‘ Owner:* ${OWNER_NAME}\n` +
-      `*ðŸ“ž Number:* +${OWNER_NUMBER}\n` +
-      `*ðŸ“¢ Channel:* ${WA_CHANNEL}\n` +
-      `*ðŸ‘¥ Group:* ${WA_GROUP}\n` +
-      `*ðŸ”— Repo:* ${REPO}\n\n` +
-      `_Thanks for connecting with ${BOT_NAME}!_ âš¡\n` +
-      `*â­ Don't forget to star my repo!* ðŸ™`;
+      `*⚡ ${BOT_NAME}*\n\n` +
+      `*👑 Owner:* ${OWNER_NAME}\n` +
+      `*📞 Number:* +${OWNER_NUMBER}\n` +
+      `*📢 Channel:* ${WA_CHANNEL}\n` +
+      `*👥 Group:* ${WA_GROUP}\n` +
+      `*🔗 Repo:* ${REPO}\n\n` +
+      `_Thanks for connecting with ${BOT_NAME}!_ ⚡\n` +
+      `*⭐ Don't forget to star my repo!* 🙏`;
 
     await sock.sendMessage(jid, { text });
 
@@ -74,28 +74,40 @@ async function createPairingSession(phoneNumber) {
         },
         printQRInTerminal: false,
         logger,
-        browser: Browsers.windows("Chrome"),
+        browser: Browsers.macOS('Safari'),
         syncFullHistory: false,
-        markOnlineOnConnect: false
+        markOnlineOnConnect: false,
+        generateHighQualityLinkPreview: false
       });
 
       activeSessions.set(sessionId, { sock, phoneNumber, status: 'pending' });
 
+      let pairingRequested = false;
       let resolved = false;
 
       sock.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect } = update;
 
-        if (!sock.authState.creds.registered && !resolved) {
+        // Request pairing code when connecting & not yet registered
+        if (
+          connection === 'connecting' &&
+          !sock.authState.creds.registered &&
+          !pairingRequested
+        ) {
+          pairingRequested = true;
           try {
-            await new Promise(r => setTimeout(r, 2000));
+            await new Promise(r => setTimeout(r, 3000));
             const jid = toJID(phoneNumber);
             const code = await sock.requestPairingCode(jid);
             const formattedCode = code?.match(/.{1,4}/g)?.join('-') || code;
 
-            activeSessions.get(sessionId).status = 'code_generated';
-            resolved = true;
-            resolve({ sessionId, pairingCode: formattedCode });
+            const session = activeSessions.get(sessionId);
+            if (session) session.status = 'code_generated';
+
+            if (!resolved) {
+              resolved = true;
+              resolve({ sessionId, pairingCode: formattedCode });
+            }
           } catch (err) {
             if (!resolved) {
               resolved = true;
@@ -108,7 +120,7 @@ async function createPairingSession(phoneNumber) {
           const session = activeSessions.get(sessionId);
           if (session) session.status = 'connected';
           await saveCreds();
-          console.log(`âœ… Session ${sessionId} connected!`);
+          console.log(`✅ Session ${sessionId} connected!`);
 
           const jid = toJID(phoneNumber);
           await sendVCard(sock, jid);
@@ -116,9 +128,14 @@ async function createPairingSession(phoneNumber) {
 
         if (connection === 'close') {
           const reason = lastDisconnect?.error?.output?.statusCode;
+          console.log(`❌ Session ${sessionId} closed. Reason: ${reason}`);
+
           if (reason === DisconnectReason.loggedOut) {
             activeSessions.delete(sessionId);
             fs.rmSync(sessionDir, { recursive: true, force: true });
+          } else if (!resolved) {
+            resolved = true;
+            reject(new Error('Connection closed before pairing completed'));
           }
         }
       });
