@@ -74,7 +74,7 @@ async function createPairingSession(phoneNumber) {
         },
         printQRInTerminal: false,
         logger,
-        browser: Browsers.macOS('Safari'),
+        browser: Browsers.windows("Chrome"),
         syncFullHistory: false,
         markOnlineOnConnect: false
       });
