@@ -76,7 +76,8 @@ async function createPairingSession(phoneNumber) {
         printQRInTerminal: false,
         logger,
         // Correction: Browser version updated for better compatibility
-        browser: ["Ubuntu", "Chrome", "20.0.04"],
+        browser: Browsers.macOS('Desktop'),
+        
         syncFullHistory: false,
         markOnlineOnConnect: true
       });
