@@ -26,7 +26,6 @@ function toJID(number) {
 
 module.exports = {
   generateSessionId,
-  generatePairCode,
   validatePhone,
   toJID
 };
