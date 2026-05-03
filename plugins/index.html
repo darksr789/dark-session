@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SURYA-X | Device Pairing</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --gold: #FFD700;
+      --gold2: #FFA500;
+      --bg: #050508;
+      --surface: #0d0d14;
+      --surface2: #13131e;
+      --border: #1e1e2e;
+      --text: #e8e8ff;
+      --muted: #6060a0;
+      --error: #ff4466;
+      --success: #00ffaa;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Rajdhani', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background:
+        radial-gradient(ellipse 80% 50% at 50% -10%, rgba(255,215,0,0.07) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 40% at 80% 100%, rgba(255,100,0,0.05) 0%, transparent 50%);
+      pointer-events: none;
+    }
+
+    body::after {
+      content: '';
+      position: fixed; inset: 0;
+      background-image:
+        linear-gradient(rgba(255,215,0,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,215,0,0.03) 1px, transparent 1px);
+      background-size: 50px 50px;
+      pointer-events: none;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid rgba(255,215,0,0.15);
+      border-radius: 20px;
+      padding: 44px 40px;
+      width: 100%;
+      max-width: 480px;
+      position: relative;
+      z-index: 1;
+      box-shadow:
+        0 0 0 1px rgba(255,215,0,0.05),
+        0 0 60px rgba(255,165,0,0.06),
+        0 32px 64px rgba(0,0,0,0.6);
+    }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 20%; right: 20%;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--gold), transparent);
+      border-radius: 2px;
+    }
+
+    /* Logo */
+    .logo-wrap {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 28px;
+    }
+
+    .logo-icon {
+      width: 52px; height: 52px;
+      background: linear-gradient(135deg, #FFD700, #FF8C00);
+      border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 0 20px rgba(255,165,0,0.35);
+      font-size: 26px; flex-shrink: 0;
+    }
+
+    .logo-title {
+      font-family: 'Orbitron', monospace;
+      font-size: 22px; font-weight: 900; letter-spacing: 3px;
+      background: linear-gradient(90deg, #FFD700, #FF8C00);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text; line-height: 1;
+    }
+
+    .logo-sub {
+      font-size: 11px; font-weight: 500; color: var(--muted);
+      letter-spacing: 2px; text-transform: uppercase; margin-top: 4px;
+    }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 4px;
+      margin-bottom: 28px;
+      gap: 4px;
+    }
+
+    .tab {
+      flex: 1;
+      padding: 11px 8px;
+      border: none;
+      border-radius: 9px;
+      background: transparent;
+      color: var(--muted);
+      font-family: 'Orbitron', monospace;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-transform: uppercase;
+    }
+
+    .tab.active {
+      background: linear-gradient(135deg, #FFD700, #FF8C00);
+      color: #000;
+      box-shadow: 0 0 16px rgba(255,165,0,0.3);
+    }
+
+    .tab:not(.active):hover { color: var(--text); }
+
+    /* Panels */
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    h2 {
+      font-family: 'Orbitron', monospace;
+      font-size: 18px; font-weight: 700;
+      color: var(--text); letter-spacing: 1px;
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      font-size: 14px; color: var(--muted);
+      margin-bottom: 28px; line-height: 1.6; font-weight: 500;
+    }
+
+    /* Input */
+    .input-label {
+      font-size: 11px; font-weight: 700;
+      letter-spacing: 2px; text-transform: uppercase;
+      color: var(--gold2); margin-bottom: 10px; display: block;
+    }
+
+    .input-wrap { position: relative; margin-bottom: 14px; }
+
+    .input-icon {
+      position: absolute; left: 16px; top: 50%;
+      transform: translateY(-50%);
+      font-size: 18px; pointer-events: none;
+    }
+
+    input[type="tel"] {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 15px 16px 15px 50px;
+      color: var(--text);
+      font-family: 'Orbitron', monospace;
+      font-size: 13px; outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      letter-spacing: 1.5px;
+    }
+
+    input[type="tel"]:focus {
+      border-color: rgba(255,215,0,0.5);
+      box-shadow: 0 0 0 3px rgba(255,215,0,0.08);
+    }
+
+    input[type="tel"]::placeholder { color: var(--muted); opacity: 0.7; }
+
+    .hint {
+      font-size: 12px; color: var(--muted);
+      margin-bottom: 24px;
+      display: flex; align-items: center; gap: 6px; font-weight: 500;
+    }
+
+    .hint::before { content: '◆'; color: var(--gold2); font-size: 7px; }
+
+    /* Button */
+    .btn {
+      width: 100%;
+      background: linear-gradient(135deg, #FFD700, #FF8C00);
+      color: #000; border: none; border-radius: 12px;
+      padding: 16px;
+      font-family: 'Orbitron', monospace;
+      font-size: 12px; font-weight: 700;
+      cursor: pointer; letter-spacing: 2px; text-transform: uppercase;
+      transition: opacity 0.2s, transform 0.1s, box-shadow 0.2s;
+      box-shadow: 0 0 24px rgba(255,165,0,0.25);
+    }
+
+    .btn:hover { opacity: 0.9; box-shadow: 0 0 36px rgba(255,165,0,0.4); }
+    .btn:active { transform: scale(0.98); }
+    .btn:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; box-shadow: none; }
+
+    .spinner {
+      display: inline-block; width: 14px; height: 14px;
+      border: 2px solid rgba(0,0,0,0.3); border-top-color: #000;
+      border-radius: 50%; animation: spin 0.7s linear infinite;
+      margin-right: 8px; vertical-align: middle;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Results */
+    #pairResult, #qrResult { margin-top: 24px; }
+
+    /* Code box */
+    .code-box {
+      background: var(--surface2);
+      border: 1px solid rgba(255,215,0,0.25);
+      border-radius: 16px; padding: 26px 22px 20px;
+      text-align: center; position: relative; overflow: hidden;
+    }
+
+    .code-box::before {
+      content: ''; position: absolute; inset: 0;
+      background: radial-gradient(ellipse at top center, rgba(255,215,0,0.05), transparent 60%);
+      pointer-events: none;
+    }
+
+    .box-label {
+      font-family: 'Orbitron', monospace;
+      font-size: 10px; font-weight: 700;
+      letter-spacing: 3px; text-transform: uppercase;
+      color: var(--gold); margin-bottom: 14px;
+    }
+
+    .code-value {
+      font-family: 'Orbitron', monospace;
+      font-size: 32px; font-weight: 900;
+      background: linear-gradient(90deg, #FFD700, #FF8C00);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text; letter-spacing: 6px; margin-bottom: 6px;
+    }
+
+    .session-id-display {
+      font-family: 'Orbitron', monospace;
+      font-size: 9px; color: var(--muted);
+      letter-spacing: 1px; margin-bottom: 18px; word-break: break-all;
+    }
+
+    .divider {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--border), transparent);
+      margin-bottom: 16px;
+    }
+
+    .steps p {
+      font-size: 13px; color: var(--muted); margin-bottom: 7px;
+      display: flex; gap: 10px; align-items: flex-start;
+      line-height: 1.5; text-align: left; font-weight: 500;
+    }
+
+    .step-num {
+      background: linear-gradient(135deg, #FFD700, #FF8C00);
+      color: #000; font-weight: 700; font-size: 10px;
+      width: 18px; height: 18px; border-radius: 50%;
+      display: inline-flex; align-items: center; justify-content: center;
+      flex-shrink: 0; margin-top: 1px;
+      font-family: 'Orbitron', monospace;
+    }
+
+    /* QR box */
+    .qr-img-wrap {
+      display: inline-block; padding: 14px;
+      background: #fff; border-radius: 14px;
+      margin-bottom: 16px;
+      box-shadow: 0 0 30px rgba(255,215,0,0.15);
+      position: relative;
+    }
+
+    .qr-img-wrap img { display: block; width: 200px; height: 200px; border-radius: 4px; }
+
+    .qr-img-wrap::before, .qr-img-wrap::after {
+      content: ''; position: absolute;
+      width: 20px; height: 20px;
+      border-color: var(--gold); border-style: solid;
+    }
+
+    .qr-img-wrap::before {
+      top: 4px; left: 4px;
+      border-width: 3px 0 0 3px; border-radius: 4px 0 0 0;
+    }
+
+    .qr-img-wrap::after {
+      bottom: 4px; right: 4px;
+      border-width: 0 3px 3px 0; border-radius: 0 0 4px 0;
+    }
+
+    /* Timer */
+    .timer-wrap {
+      display: flex; align-items: center; justify-content: center;
+      gap: 8px; margin-bottom: 10px;
+    }
+
+    .timer-label { font-size: 12px; color: var(--muted); font-weight: 600; }
+
+    .timer-value {
+      font-family: 'Orbitron', monospace;
+      font-size: 13px; font-weight: 700; color: var(--gold); min-width: 36px;
+    }
+
+    .timer-bar-wrap {
+      width: 100%; height: 3px; background: var(--border);
+      border-radius: 2px; margin-bottom: 18px; overflow: hidden;
+    }
+
+    .timer-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #FFD700, #FF8C00);
+      border-radius: 2px; transition: width 1s linear;
+    }
+
+    /* Expired overlay */
+    .qr-expired-overlay {
+      position: absolute; inset: 0;
+      background: rgba(5,5,8,0.88);
+      border-radius: 14px;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 10px; backdrop-filter: blur(2px);
+    }
+
+    .qr-expired-overlay span {
+      font-family: 'Orbitron', monospace;
+      font-size: 11px; font-weight: 700;
+      color: var(--error); letter-spacing: 2px;
+    }
+
+    .refresh-btn {
+      background: linear-gradient(135deg, #FFD700, #FF8C00);
+      color: #000; border: none; border-radius: 8px;
+      padding: 8px 18px;
+      font-family: 'Orbitron', monospace;
+      font-size: 10px; font-weight: 700; letter-spacing: 1.5px; cursor: pointer;
+    }
+
+    /* Info card */
+    .info-card {
+      margin-top: 14px;
+      background: var(--surface2);
+      border: 1px solid rgba(0,255,170,0.2);
+      border-radius: 16px; overflow: hidden;
+      animation: fadeUp 0.5s ease forwards;
+    }
+
+    .info-card-header {
+      background: linear-gradient(90deg, rgba(0,255,170,0.1), rgba(0,255,170,0.03));
+      border-bottom: 1px solid rgba(0,255,170,0.15);
+      padding: 13px 20px;
+      display: flex; align-items: center; gap: 10px;
+    }
+
+    .connected-dot {
+      width: 9px; height: 9px; border-radius: 50%;
+      background: var(--success); box-shadow: 0 0 10px var(--success);
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    .info-card-header span {
+      font-family: 'Orbitron', monospace;
+      font-size: 11px; font-weight: 700;
+      letter-spacing: 2px; color: var(--success); text-transform: uppercase;
+    }
+
+    .info-card-body {
+      padding: 18px;
+      display: flex; flex-direction: column; gap: 12px;
+    }
+
+    .info-row { display: flex; align-items: center; gap: 14px; }
+
+    .info-icon {
+      width: 38px; height: 38px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 17px; flex-shrink: 0;
+      background: var(--surface); border: 1px solid var(--border);
+    }
+
+    .info-title {
+      font-size: 10px; color: var(--muted);
+      letter-spacing: 1.5px; text-transform: uppercase;
+      font-weight: 700; margin-bottom: 3px;
+    }
+
+    .info-value { font-size: 14px; color: var(--text); font-weight: 700; }
+
+    .info-link {
+      color: var(--gold); text-decoration: none;
+      font-size: 13px; font-weight: 600;
+      transition: opacity 0.2s;
+    }
+
+    .info-link:hover { opacity: 0.75; }
+    .coming-soon { font-size: 12px; color: var(--muted); font-style: italic; }
+
+    /* Error */
+    .error-box {
+      background: rgba(255,68,102,0.07);
+      border: 1px solid rgba(255,68,102,0.25);
+      border-radius: 12px; padding: 14px 18px;
+      color: var(--error); font-size: 13px;
+      display: flex; align-items: center; gap: 10px; font-weight: 600;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.4; }
+    }
+
+    .fade-up { animation: fadeUp 0.4s ease forwards; }
+  </style>
+</head>
+<body>
+<div class="card">
+
+  <!-- Logo -->
+  <div class="logo-wrap">
+    <div class="logo-icon">⚡</div>
+    <div>
+      <div class="logo-title">SURYA-X</div>
+      <div class="logo-sub">WhatsApp Bot System</div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('pair')">📱 Phone Number</button>
+    <button class="tab" onclick="switchTab('qr')">📷 QR Code</button>
+  </div>
+
+  <!-- ── Pair Panel ── -->
+  <div class="panel active" id="pairPanel">
+    <h2>PAIR YOUR DEVICE</h2>
+    <p class="subtitle">Enter your WhatsApp number to receive a pairing code and link your device.</p>
+
+    <label class="input-label" for="phone">Phone Number</label>
+    <div class="input-wrap">
+      <span class="input-icon">📱</span>
+      <input type="tel" id="phone" placeholder="917797XXXXX" autocomplete="off" inputmode="numeric"/>
+    </div>
+    <p class="hint">Include country code — e.g. 917797XXXXXX for India</p>
+
+    <button class="btn" id="pairBtn" onclick="requestPair()">⚡ GENERATE PAIRING CODE</button>
+    <div id="pairResult"></div>
+  </div>
+
+  <!-- ── QR Panel ── -->
+  <div class="panel" id="qrPanel">
+    <h2>SCAN QR CODE</h2>
+    <p class="subtitle">Click the button below to generate a QR code and scan it with WhatsApp.</p>
+
+    <button class="btn" id="qrBtn" onclick="requestQR()">⚡ GENERATE QR CODE</button>
+    <div id="qrResult"></div>
+  </div>
+
+</div>
+
+<script>
+  // ── Owner Info ───────────────────────────────────────
+  const OWNER_NAME   = "DARK SURYA";
+  const OWNER_NUMBER = "+917797099719";
+  const BOT_REPO     = "https://github.com/darksurya345/SURYA-X";
+  const WA_CHANNEL   = "https://whatsapp.com/channel/0029Vb64JNKJf05UHKREBM1h";
+  // ────────────────────────────────────────────────────
+
+  const QR_TIMEOUT = 60;
+  let qrTimer = null;
+
+  // ── Tab Switch ───────────────────────────────────────
+  function switchTab(tab) {
+    document.querySelectorAll('.tab').forEach((t, i) => {
+      t.classList.toggle('active', (i === 0 && tab === 'pair') || (i === 1 && tab === 'qr'));
+    });
+    document.getElementById('pairPanel').classList.toggle('active', tab === 'pair');
+    document.getElementById('qrPanel').classList.toggle('active', tab === 'qr');
+  }
+
+  // ── Pairing Code ─────────────────────────────────────
+  async function requestPair() {
+    const phone  = document.getElementById('phone').value.trim().replace(/[\s\-\(\)\+]/g, '');
+    const btn    = document.getElementById('pairBtn');
+    const result = document.getElementById('pairResult');
+
+    if (!phone)                     { showError(result, 'Please enter your phone number!'); return; }
+    if (!/^\d{7,15}$/.test(phone)) { showError(result, 'Invalid number — include country code (e.g. 8801XXXXXXXXX)'); return; }
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>GENERATING...';
+    result.innerHTML = '';
+
+    try {
+      const res  = await fetch('/api/pair', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone })
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        showPairCode(result, data.pairingCode, data.sessionId);
+      } else {
+        showError(result, data.message || 'Failed to generate code. Please try again.');
+      }
+    } catch {
+      showError(result, 'Connection error. Please check your internet.');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '⚡ GENERATE PAIRING CODE';
+    }
+  }
+
+  function showPairCode(result, code, sessionId) {
+    result.innerHTML = `
+      <div class="code-box fade-up">
+        <div class="box-label">◆ Your Pairing Code ◆</div>
+        <div class="code-value">${code}</div>
+        <div class="session-id-display">SESSION · ${sessionId}</div>
+        <div class="divider"></div>
+        <div class="steps">
+          <p><span class="step-num">1</span>Open WhatsApp on your phone</p>
+          <p><span class="step-num">2</span>Go to Settings → Linked Devices</p>
+          <p><span class="step-num">3</span>Tap on "Link a Device"</p>
+          <p><span class="step-num">4</span>Select "Link with phone number"</p>
+          <p><span class="step-num">5</span>Enter the code shown above</p>
+        </div>
+      </div>
+      <div id="pairInfoCard"></div>
+    `;
+    pollStatus('/api/status/', sessionId, 'pairInfoCard');
+  }
+
+  // ── QR Code ──────────────────────────────────────────
+  async function requestQR() {
+    const btn    = document.getElementById('qrBtn');
+    const result = document.getElementById('qrResult');
+
+    if (qrTimer) { clearInterval(qrTimer); qrTimer = null; }
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>GENERATING...';
+    result.innerHTML = '';
+
+    try {
+      const res  = await fetch('/api/qr', { method: 'POST' });
+      const data = await res.json();
+
+      if (data.success) {
+        showQR(result, data.qrDataURL, data.sessionId);
+      } else {
+        showError(result, data.message || 'Failed to generate QR. Please try again.');
+      }
+    } catch {
+      showError(result, 'Connection error. Please check your internet.');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '⚡ GENERATE QR CODE';
+    }
+  }
+
+  function showQR(result, qrDataURL, sessionId) {
+    result.innerHTML = `
+      <div class="code-box fade-up">
+        <div class="box-label">◆ Scan With WhatsApp ◆</div>
+        <div class="qr-img-wrap" id="qrImgWrap">
+          <img id="qrImg" src="${qrDataURL}" alt="QR Code"/>
+        </div>
+        <div class="session-id-display">SESSION · ${sessionId}</div>
+        <div class="timer-wrap">
+          <span class="timer-label">Expires in</span>
+          <span class="timer-value" id="qrTimerVal">${QR_TIMEOUT}s</span>
+        </div>
+        <div class="timer-bar-wrap">
+          <div class="timer-bar" id="qrTimerBar" style="width:100%"></div>
+        </div>
+        <div class="divider"></div>
+        <div class="steps">
+          <p><span class="step-num">1</span>Open WhatsApp on your phone</p>
+          <p><span class="step-num">2</span>Go to Settings → Linked Devices</p>
+          <p><span class="step-num">3</span>Tap on "Link a Device"</p>
+          <p><span class="step-num">4</span>Point your camera at the QR code</p>
+        </div>
+      </div>
+      <div id="qrInfoCard"></div>
+    `;
+
+    startQRTimer();
+    pollStatus('/api/qr/status/', sessionId, 'qrInfoCard', true);
+  }
+
+  function startQRTimer() {
+    let remaining = QR_TIMEOUT;
+    qrTimer = setInterval(() => {
+      remaining--;
+      const bar = document.getElementById('qrTimerBar');
+      const val = document.getElementById('qrTimerVal');
+      if (bar) bar.style.width = (remaining / QR_TIMEOUT * 100) + '%';
+      if (val) val.textContent = remaining + 's';
+
+      if (remaining <= 15) {
+        if (bar) bar.style.background = 'linear-gradient(90deg, #ff4466, #ff6644)';
+        if (val) val.style.color = '#ff4466';
+      }
+
+      if (remaining <= 0) {
+        clearInterval(qrTimer);
+        const wrap = document.getElementById('qrImgWrap');
+        if (wrap && !wrap.querySelector('.qr-expired-overlay')) {
+          const ov = document.createElement('div');
+          ov.className = 'qr-expired-overlay';
+          ov.innerHTML = `<span>⚠ QR EXPIRED</span><button class="refresh-btn" onclick="requestQR()">🔄 REFRESH</button>`;
+          wrap.appendChild(ov);
+        }
+      }
+    }, 1000);
+  }
+
+  // ── Poll Status ───────────────────────────────────────
+  function pollStatus(endpoint, sessionId, cardId, isQR = false) {
+    const iv = setInterval(async () => {
+      try {
+        const res  = await fetch(endpoint + sessionId);
+        const data = await res.json();
+
+        if (isQR && data.status === 'qr_refreshed' && data.qr) {
+          const img = document.getElementById('qrImg');
+          if (img) img.src = data.qr;
+        }
+
+        if (data.status === 'connected') {
+          clearInterval(iv);
+          if (isQR && qrTimer) clearInterval(qrTimer);
+          showInfoCard(cardId);
+        }
+      } catch {}
+    }, 2500);
+    setTimeout(() => clearInterval(iv), 180000);
+  }
+
+  // ── Info Card ─────────────────────────────────────────
+  function showInfoCard(cardId) {
+    const card = document.getElementById(cardId);
+    if (!card) return;
+    card.className = 'info-card';
+    card.innerHTML = `
+      <div class="info-card-header">
+        <div class="connected-dot"></div>
+        <span>Device Connected!</span>
+      </div>
+      <div class="info-card-body">
+        <div class="info-row">
+          <div class="info-icon">👑</div>
+          <div>
+            <div class="info-title">Owner</div>
+            <div class="info-value">${OWNER_NAME}${OWNER_NUMBER ? ' · ' + OWNER_NUMBER : ''}</div>
+          </div>
+        </div>
+        <div class="info-row">
+          <div class="info-icon">🤖</div>
+          <div>
+            <div class="info-title">Bot Repository</div>
+            ${BOT_REPO
+              ? `<a class="info-link" href="${BOT_REPO}" target="_blank">🔗 GitHub Repo →</a>`
+              : `<span class="coming-soon">Coming soon...</span>`}
+          </div>
+        </div>
+        <div class="info-row">
+          <div class="info-icon">📢</div>
+          <div>
+            <div class="info-title">WhatsApp Channel</div>
+            ${WA_CHANNEL
+              ? `<a class="info-link" href="${WA_CHANNEL}" target="_blank">📲 Join Channel →</a>`
+              : `<span class="coming-soon">Coming soon...</span>`}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  // ── Error ─────────────────────────────────────────────
+  function showError(el, msg) {
+    el.innerHTML = `<div class="error-box fade-up"><span>⚠</span><span>${msg}</span></div>`;
+  }
+
+  // Enter key for phone input
+  document.getElementById('phone').addEventListener('keydown', e => {
+    if (e.key === 'Enter') requestPair();
+  });
+</script>
+<!-- Footer -->
+<div style="margin-top:24px; text-align:center; position:relative; z-index:1;">
+  <div style="display:flex; align-items:center; gap:10px; justify-content:center; margin-bottom:8px;">
+    <div style="height:1px; width:50px; background:linear-gradient(90deg, transparent, rgba(255,215,0,0.3));"></div>
+    <span style="font-family:'Orbitron',monospace; font-size:9px; font-weight:700; letter-spacing:3px; background:linear-gradient(90deg,#FFD700,#FF8C00); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; text-transform:uppercase;">⚡ SURYA-X ⚡</span>
+    <div style="height:1px; width:50px; background:linear-gradient(90deg, rgba(255,215,0,0.3), transparent);"></div>
+  </div>
+  <p style="font-family:'Rajdhani',sans-serif; font-size:11px; font-weight:600; letter-spacing:2px; color:#3a3a60; text-transform:uppercase;">© 2026 SURYA-X · All Rights Reserved</p>
+</div>
+
+</body>
+</html>
