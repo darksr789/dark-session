@@ -1,174 +1,243 @@
-const {
-  default: makeWASocket,
-  useMultiFileAuthState,
-  DisconnectReason,
-  makeCacheableSignalKeyStore,
-  Browsers
-} = require('@whiskeysockets/baileys');
-const pino = require('pino');
-const path = require('path');
-const fs = require('fs');
-const { generateSessionId, toJID } = require('./id');
+import express from "express";
+import fs from "fs";
+import pino from "pino";
+import {
+    makeWASocket,
+    useMultiFileAuthState,
+    delay,
+    makeCacheableSignalKeyStore,
+    Browsers,
+    jidNormalizedUser,
+    fetchLatestBaileysVersion,
+} from "@whiskeysockets/baileys";
+import pn from "awesome-phonenumber";
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 
-const activeSessions = new Map();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
-// —— Owner Info ——————————————————————————————————————————————
-const OWNER_NAME   = "DARK SURYA";
-const OWNER_NUMBER = "917797099719";
-const WA_CHANNEL   = "https://whatsapp.com/channel/0029Vb64JNKJf05UHKREBM1h";
-const WA_GROUP     = "https://chat.whatsapp.com/L0oWvAe4eeb6HBYIEPXGbo?mode=gi_t";
-const REPO         = "https://github.com/darksurya345/SURYA-X";
-const BOT_NAME     = "SURYA-X BOT";
-// ——————————————————————————————————————————————————————————————
+const router = express.Router();
 
-async function sendVCard(sock, jid) {
-  try {
-    const vcard =
-      `BEGIN:VCARD\n` +
-      `VERSION:3.0\n` +
-      `FN:${BOT_NAME}\n` +
-      `ORG:${BOT_NAME};\n` +
-      `TEL;type=CELL;type=VOICE;waid=${OWNER_NUMBER}:+${OWNER_NUMBER}\n` +
-      `END:VCARD`;
-
-    const text =
-      `*⚡ ${BOT_NAME}*\n\n` +
-      `*👑 Owner:* ${OWNER_NAME}\n` +
-      `*📞 Number:* +${OWNER_NUMBER}\n` +
-      `*📢 Channel:* ${WA_CHANNEL}\n` +
-      `*👥 Group:* ${WA_GROUP}\n` +
-      `*🔗 Repo:* ${REPO}\n\n` +
-      `_Thanks for connecting with ${BOT_NAME}!_ ⚡\n` +
-      `*⭐ Don't forget to star my repo!* 🙏`;
-
-    await sock.sendMessage(jid, { text });
-
-    await sock.sendMessage(jid, {
-      contacts: {
-        displayName: BOT_NAME,
-        contacts: [{ vcard }]
-      }
-    });
-  } catch (err) {
-    console.error('vCard send error:', err.message);
-  }
-}
-
-async function createPairingSession(phoneNumber) {
-  const sessionId = generateSessionId();
-  const sessionDir = path.join(__dirname, 'sessions', sessionId);
-
-  // Auto-create session directory
-  if (!fs.existsSync(sessionDir)) {
-    fs.mkdirSync(sessionDir, { recursive: true });
-  }
-
-  return new Promise(async (resolve, reject) => {
+/* ===== SHORT SESSION ID GENERATOR WITH BASE64 ENCODING ===== */
+async function generateShortSession(credsPath) {
     try {
-      const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
-      const logger = pino({ level: 'silent' });
-
-      const sock = makeWASocket({
-        auth: {
-          creds: state.creds,
-          keys: makeCacheableSignalKeyStore(state.keys, logger)
-        },
-        printQRInTerminal: false,
-        logger,
-        // Correction: Browser version updated for better compatibility
-        browser: Browsers.macOS('Desktop'),
+        // Read the actual creds.json file
+        const credsData = fs.readFileSync(credsPath, 'utf-8');
         
-        syncFullHistory: false,
-        markOnlineOnConnect: true
-      });
-
-      activeSessions.set(sessionId, { sock, phoneNumber, status: 'pending' });
-
-      let resolved = false;
-
-      sock.ev.on('connection.update', async (update) => {
-        const { connection, lastDisconnect } = update;
-
-        // Handling Pairing Code Generation
-        if (!sock.authState.creds.registered && !resolved) {
-          // Correction: Added a longer delay to ensure socket is ready
-          setTimeout(async () => {
-            try {
-              // Cleaning the phone number to ensure only digits are sent
-              const cleanNumber = phoneNumber.replace(/[^0-9]/g, '');
-              const code = await sock.requestPairingCode(cleanNumber);
-
-              const formattedCode = code?.match(/.{1,4}/g)?.join('-') || code;
-
-              activeSessions.get(sessionId).status = 'code_generated';
-              resolved = true;
-              resolve({ sessionId, pairingCode: formattedCode });
-            } catch (err) {
-              if (!resolved) {
-                resolved = true;
-                reject(new Error('Failed to generate pairing code: ' + err.message));
-              }
-            }
-          }, 3000); 
-        }
-
-        if (connection === 'open') {
-          const session = activeSessions.get(sessionId);
-          if (session) session.status = 'connected';
-          await saveCreds();
-          console.log(`✅ Session ${sessionId} connected!`);
-
-          const jid = toJID(phoneNumber);
-          await sendVCard(sock, jid);
-        }
-
-        if (connection === 'close') {
-          const reason = lastDisconnect?.error?.output?.statusCode;
-          // Re-attempt connection if not logged out
-          if (reason !== DisconnectReason.loggedOut) {
-             // Optional: Add auto-reconnect logic here if needed
-          } else {
-            activeSessions.delete(sessionId);
-            if (fs.existsSync(sessionDir)) {
-                fs.rmSync(sessionDir, { recursive: true, force: true });
-            }
-          }
-        }
-      });
-
-      sock.ev.on('creds.update', saveCreds);
-
-      // Increased timeout for slow connections
-      setTimeout(() => {
-        if (!resolved) {
-          resolved = true;
-          reject(new Error('Pairing code request timed out. Please try again.'));
-        }
-      }, 150000);
-
-    } catch (err) {
-      reject(err);
+        // Encode the credentials to base64
+        const base64Creds = Buffer.from(credsData).toString('base64');
+        
+        // Generate session ID with prefix
+        const y = new Date().getFullYear();
+        const r = Math.random().toString(36).substring(2, 6).toUpperCase();
+        const sessionId = `SURYA-X~`;
+        
+        // Return both session ID and encoded data
+        return {
+            sessionId: sessionId,
+            encodedData: base64Creds
+        };
+    } catch (error) {
+        console.error("Error generating short session:", error);
+        return null;
     }
-  });
 }
 
-function getSessionStatus(sessionId) {
-  const session = activeSessions.get(sessionId);
-  if (!session) return { status: 'not_found' };
-  return { status: session.status, phoneNumber: session.phoneNumber };
+/* ===== HELPERS ===== */
+function rm(p) {
+    try { 
+        if (fs.existsSync(p)) fs.rmSync(p, { recursive: true, force: true }); 
+    } catch(e) {
+        console.log("Cleanup error:", e);
+    }
 }
 
-async function closeSession(sessionId) {
-  const session = activeSessions.get(sessionId);
-  if (session) {
-    try { await session.sock.logout(); } catch (_) {}
-    activeSessions.delete(sessionId);
+/* ===== ROUTE ===== */
+router.get("/", async (req, res) => {
+    let num = (req.query.number || "").replace(/[^0-9]/g, "");
+    if (!num) return res.status(400).send({ code: "Number required" });
+
+    const phone = pn("+" + num);
+    if (!phone.isValid()) return res.status(400).send({ code: "Invalid number" });
+    num = phone.getNumber("e164").replace("+", "");
+
+    const dir = "./session" + num;
+    rm(dir);
+
+    async function start() {
+        const { state, saveCreds } = await useMultiFileAuthState(dir);
+        const { version } = await fetchLatestBaileysVersion();
+
+        const sock = makeWASocket({
+            version,
+            auth: {
+                creds: state.creds,
+                keys: makeCacheableSignalKeyStore(state.keys, pino({ level: "fatal" })),
+            },
+            logger: pino({ level: "fatal" }),
+            browser: Browsers.windows("Chrome"),
+            printQRInTerminal: false,
+            markOnlineOnConnect: false,
+        });
+
+        sock.ev.on("creds.update", saveCreds);
+
+        sock.ev.on("connection.update", async ({ connection, lastDisconnect }) => {
+            if (connection === "open") {
+                try {
+                    // Wait for creds to be saved
+                    await delay(3000);
+                    
+                    // Path to creds.json
+                    const credsPath = join(dir, 'creds.json');
+                    
+                    // Generate short session with encoded data
+                    const sessionInfo = await generateShortSession(credsPath);
+                    
+                    if (!sessionInfo) {
+                        throw new Error("Failed to generate session");
+                    }
+
+                    const jid = jidNormalizedUser(num + "@s.whatsapp.net");
+
+                    // 1️⃣ Send the COMPLETE session string (SESSION_ID + base64 data)
+                    const completeSession = `${sessionInfo.sessionId}${sessionInfo.encodedData}`;
+                    await sock.sendMessage(jid, { 
+                        text: `${completeSession}` 
+                    });
+
+                    // 2️⃣ Wait 2 seconds
+                    await delay(2000);
+
+                  // 3️⃣ Send bot info (ALIVE STYLE: Fake vCard + Image + Caption)
+
+// ---- Fake vCard (quoted, upar show hoga) ----
+const fakeVCardQuoted = {
+  key: {
+    fromMe: false,
+    participant: "0@s.whatsapp.net",
+    remoteJid: "status@broadcast"
+  },
+  message: {
+    contactMessage: {
+      displayName: "© SURYA-X",
+      vcard: `BEGIN:VCARD
+VERSION:3.0
+FN:© SURYA-X
+ORG:DarkSurya Official;
+TEL;type=CELL;type=VOICE;waid=13135550002:+13135550002
+END:VCARD`
+    }
   }
-}
-
-module.exports = {
-  createPairingSession,
-  getSessionStatus,
-  closeSession,
-  activeSessions
 };
+
+// ---- Caption (alive.js style bot details) ----
+const caption = `
+╭━〔 *ꜱᴜʀʏᴀ-x* 〕━··๏
+┃★╭──────────────
+┃★│ 👑 Owner : *DARKSURYA Official*
+┃★│ 🤖 Baileys : *Multi Device*
+┃★│ 💻 Type : *NodeJs*
+┃★│ 🚀 Platform : *Render*
+┃★│ ⚙️ Mode : *Public*
+┃★│ 🔣 Prefix : *[ . ]*
+┃★│ 🏷️ Version : *8.0.0*
+┃★╰──────────────
+╰━━━━━━━━━━━━━━┈⊷`;
+
+// ---- Send IMAGE + caption, quoted with fake vCard ----
+await sock.sendMessage(
+  jid,
+  {
+    image: { url: "https://files.catbox.moe/jbrn0i.jpg" },
+    caption,
+    contextInfo: {
+      mentionedJid: [jid],
+      forwardingScore: 999,
+      isForwarded: true,
+      forwardedNewsletterMessageInfo: {
+        newsletterJid: "120363419670264413@newsletter",
+        newsletterName: "❀༒★[ꜱᴜʀʏᴀ-x]★༒❀",
+        serverMessageId: 143
+      }
+    }
+  },
+  { quoted: fakeVCardQuoted }
+);
+                    // 4️⃣ Cleanup
+                    await delay(2000);
+                    rm(dir);
+                    
+                    // Exit gracefully
+                    setTimeout(() => {
+                        process.exit(0);
+                    }, 1000);
+                    
+                } catch (err) {
+                    console.error("❌ Error in pairing process:", err);
+                    rm(dir);
+                    
+                    // Try to send error to user
+                    try {
+                        const jid = jidNormalizedUser(num + "@s.whatsapp.net");
+                        await sock.sendMessage(jid, { 
+                            text: "❌ Error generating session. Please try again." 
+                        });
+                    } catch(e) {}
+                    
+                    process.exit(1);
+                }
+            }
+
+            if (connection === "close") {
+                const c = lastDisconnect?.error?.output?.statusCode;
+                if (c !== 401) {
+                    setTimeout(() => start(), 2000);
+                }
+            }
+        });
+
+        if (!sock.authState.creds.registered) {
+            await delay(3000);
+            try {
+                let code = await sock.requestPairingCode(num);
+                code = code?.match(/.{1,4}/g)?.join("-") || code;
+                if (!res.headersSent) {
+                    res.send({ 
+                        success: true, 
+                        code: code,
+                        message: "Scan QR code or use pairing code to connect" 
+                    });
+                }
+            } catch(err) {
+                console.error("Pairing error:", err);
+                if (!res.headersSent) {
+                    res.status(503).send({ 
+                        code: "PAIR_FAIL", 
+                        error: err.message 
+                    });
+                }
+                rm(dir);
+                process.exit(1);
+            }
+        }
+    }
+
+    start();
+});
+
+/* ===== SAFETY ===== */
+process.on("uncaughtException", (err) => {
+    const e = String(err);
+    if (e.includes("conflict") || e.includes("not-authorized") || e.includes("Timed Out")) return;
+    console.error("Crash:", err);
+});
+
+process.on("unhandledRejection", (err) => {
+    console.error("Unhandled Rejection:", err);
+});
+
+export default router;
+
+//coded by DARKSURYA Official 🇮🇳
