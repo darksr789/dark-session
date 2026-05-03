@@ -95,8 +95,9 @@ async function createPairingSession(phoneNumber) {
           setTimeout(async () => {
             try {
               // Cleaning the phone number to ensure only digits are sent
-              const cleanNumber = phoneNumber.replace(/[^\d]/g, '');
+              const cleanNumber = phoneNumber.replace(/[^0-9]/g, '');
               const code = await sock.requestPairingCode(cleanNumber);
+
               const formattedCode = code?.match(/.{1,4}/g)?.join('-') || code;
 
               activeSessions.get(sessionId).status = 'code_generated';
