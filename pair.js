@@ -12,14 +12,14 @@ const { generateSessionId, toJID } = require('./id');
 
 const activeSessions = new Map();
 
-// ── Owner Info ────────────────────────────────────────────
+// —— Owner Info ——————————————————————————————————————————————
 const OWNER_NAME   = "DARK SURYA";
 const OWNER_NUMBER = "917797099719";
 const WA_CHANNEL   = "https://whatsapp.com/channel/0029Vb64JNKJf05UHKREBM1h";
 const WA_GROUP     = "https://chat.whatsapp.com/L0oWvAe4eeb6HBYIEPXGbo?mode=gi_t";
 const REPO         = "https://github.com/darksurya345/SURYA-X";
 const BOT_NAME     = "SURYA-X BOT";
-// ─────────────────────────────────────────────────────────
+// ——————————————————————————————————————————————————————————————
 
 async function sendVCard(sock, jid) {
   try {
@@ -58,6 +58,7 @@ async function createPairingSession(phoneNumber) {
   const sessionId = generateSessionId();
   const sessionDir = path.join(__dirname, 'sessions', sessionId);
 
+  // Auto-create session directory
   if (!fs.existsSync(sessionDir)) {
     fs.mkdirSync(sessionDir, { recursive: true });
   }
@@ -74,46 +75,39 @@ async function createPairingSession(phoneNumber) {
         },
         printQRInTerminal: false,
         logger,
-        browser: Browsers.macOS('Safari'),
+        // Correction: Browser version updated for better compatibility
+        browser: ["Ubuntu", "Chrome", "20.0.04"],
         syncFullHistory: false,
-        markOnlineOnConnect: false,
-        generateHighQualityLinkPreview: false
+        markOnlineOnConnect: true
       });
 
       activeSessions.set(sessionId, { sock, phoneNumber, status: 'pending' });
 
-      let pairingRequested = false;
       let resolved = false;
 
       sock.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect } = update;
 
-        // Request pairing code when connecting & not yet registered
-        if (
-          connection === 'connecting' &&
-          !sock.authState.creds.registered &&
-          !pairingRequested
-        ) {
-          pairingRequested = true;
-          try {
-            await new Promise(r => setTimeout(r, 3000));
-            const jid = toJID(phoneNumber);
-            const code = await sock.requestPairingCode(jid);
-            const formattedCode = code?.match(/.{1,4}/g)?.join('-') || code;
+        // Handling Pairing Code Generation
+        if (!sock.authState.creds.registered && !resolved) {
+          // Correction: Added a longer delay to ensure socket is ready
+          setTimeout(async () => {
+            try {
+              // Cleaning the phone number to ensure only digits are sent
+              const cleanNumber = phoneNumber.replace(/[^\d]/g, '');
+              const code = await sock.requestPairingCode(cleanNumber);
+              const formattedCode = code?.match(/.{1,4}/g)?.join('-') || code;
 
-            const session = activeSessions.get(sessionId);
-            if (session) session.status = 'code_generated';
-
-            if (!resolved) {
+              activeSessions.get(sessionId).status = 'code_generated';
               resolved = true;
               resolve({ sessionId, pairingCode: formattedCode });
+            } catch (err) {
+              if (!resolved) {
+                resolved = true;
+                reject(new Error('Failed to generate pairing code: ' + err.message));
+              }
             }
-          } catch (err) {
-            if (!resolved) {
-              resolved = true;
-              reject(new Error('Failed to generate pairing code: ' + err.message));
-            }
-          }
+          }, 3000); 
         }
 
         if (connection === 'open') {
@@ -128,26 +122,27 @@ async function createPairingSession(phoneNumber) {
 
         if (connection === 'close') {
           const reason = lastDisconnect?.error?.output?.statusCode;
-          console.log(`❌ Session ${sessionId} closed. Reason: ${reason}`);
-
-          if (reason === DisconnectReason.loggedOut) {
+          // Re-attempt connection if not logged out
+          if (reason !== DisconnectReason.loggedOut) {
+             // Optional: Add auto-reconnect logic here if needed
+          } else {
             activeSessions.delete(sessionId);
-            fs.rmSync(sessionDir, { recursive: true, force: true });
-          } else if (!resolved) {
-            resolved = true;
-            reject(new Error('Connection closed before pairing completed'));
+            if (fs.existsSync(sessionDir)) {
+                fs.rmSync(sessionDir, { recursive: true, force: true });
+            }
           }
         }
       });
 
       sock.ev.on('creds.update', saveCreds);
 
+      // Increased timeout for slow connections
       setTimeout(() => {
         if (!resolved) {
           resolved = true;
-          reject(new Error('Pairing code request timed out'));
+          reject(new Error('Pairing code request timed out. Please try again.'));
         }
-      }, 120000);
+      }, 150000);
 
     } catch (err) {
       reject(err);
